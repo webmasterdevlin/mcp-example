@@ -11,18 +11,20 @@ Project Pal is a full-stack Next.js application that demonstrates how to build a
 -   **Conversational Interface:** Manage your project tasks by talking to an AI in plain English.
 -   **AI-Powered Actions:** The AI can create and retrieve tasks from a database.
 -   **Secure Tool Use with MCP:** Built on the Model Context Protocol, ensuring a secure and decoupled architecture between the AI and the application's business logic.
--   **Persistent Storage:** Easily connect to your preferred database (Supabase, Neon, etc.) to save your tasks.
+-   **Dual API for Decoupled Architecture:** The backend provides two specialized endpoints to serve both the built-in Next.js frontend and any external Single Page Application (SPA).
 -   **Modern Tech Stack:** Built with Next.js (App Router), the Vercel AI SDK, and shadcn/ui.
 
 ## Architecture Overview
 
-This application uses a decoupled, client-server architecture based on MCP:
+This application is designed with a decoupled architecture, making it highly flexible.
 
 1.  **The MCP Server (`/api/mcp`):** A secure, headless API that exposes "tools" (like `create_task` and `get_tasks`). It contains all the business logic and is the only part of the app that communicates with the database.
-2.  **The MCP Host (`/app/actions.tsx`):** The server-side logic that orchestrates the conversation. It takes the user's prompt, discovers the available tools from the MCP Server, and works with the LLM to decide which tool to call.
-3.  **The UI (`/app/page.tsx`):** A client-side chat interface built with React, shadcn/ui, and the Vercel AI SDK's `useActions` hook.
+2.  **The Chat Endpoints:**
+    -   **`/api/chat` (Streaming):** This endpoint provides a streaming response, designed for the built-in Next.js frontend using the Vercel AI SDK's `useChat` hook for a real-time "typing" effect.
+    -   **`/api/chat-spa` (JSON):** This endpoint provides a standard JSON response, designed for external clients like a React, Vue, or Angular SPA.
+3.  **The UI (`/app/page.tsx`):** A client-side chat interface built with React, shadcn/ui, and the Vercel AI SDK's `useChat` hook.
 
-This separation ensures that the AI model never has direct access to your database, providing a robust security layer.
+This separation ensures that the AI model never has direct access to your database and that you can support multiple frontend clients with a single backend.
 
 ## Getting Started
 
@@ -62,6 +64,23 @@ Open [http://localhost:3000](http://localhost:3000) in your browser to see the a
 
 ---
 
+## Connecting to an External SPA
+
+This project is built to serve not only its own frontend but also any external Single Page Application (SPA).
+
+To connect your external SPA, make `POST` requests to the dedicated **`/api/chat-spa`** endpoint. This endpoint accepts a JSON body with a `messages` array and returns a single JSON object with the AI's response.
+
+**Example `fetch` call from a React/Vue/Svelte app:**
+```javascript
+const response = await fetch('http://localhost:3000/api/chat-spa', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ messages: yourChatHistoryArray })
+});
+const data = await response.json();
+// data.message will contain the AI's response
+```
+
 ## Connecting a Database
 
 By default, the application uses a temporary, in-memory mock database that **resets with every server restart**. To save your tasks permanently, you must connect a real database.
@@ -93,20 +112,7 @@ By default, the application uses a temporary, in-memory mock database that **res
 
 5.  **Restart your server.** The application is already configured to use these variables and will automatically connect to your Supabase database.
 
-### Option 2: Using Neon
-
-1.  **Create a Neon Project:** Go to [neon.tech](https://neon.tech), create a new project, and get your database **connection string**.
-
-2.  **Update Environment Variables:** Add the connection string to your `.env.local` file.
-    ```bash
-    # .env.local
-    OPENAI_API_KEY="sk-..."
-    DATABASE_URL="YOUR_NEON_CONNECTION_STRING_HERE"
-    ```
-
-3.  **Modify the MCP Server:** You'll need to adjust the code in `/app/api/mcp/route.ts` to use the Neon client instead of the Supabase client. You would replace the Supabase calls with queries using the `@neondatabase/serverless` package.
-
-### Option 3: Using Any Other Database
+### Option 2: Using Neon or Any Other Database
 
 The principle is the same for any database:
 
@@ -123,6 +129,6 @@ This application is a proof-of-concept and is missing several features you'd wan
 
 -   **User Authentication:** Currently, all tasks are global. There is no concept of individual users. You would need to add an authentication system (like NextAuth.js or Supabase Auth) to manage user-specific tasks.
 -   **More Sophisticated Tools:** The AI can only create and get tasks. A real application would need tools for updating, deleting, and assigning tasks.
--   **UI Feedback for Tool Calls:** When the AI is using a tool, the UI doesn't show a loading state. A production app should stream UI updates to let the user know that work is being done in the background.
+-   **UI Feedback for Tool Calls:** While the AI is thinking, the UI could provide more specific feedback, like "Creating your task..." instead of just a generic thinking indicator.
 -   **Robust Error Handling:** While the server logs errors, the UI doesn't display them to the user in a friendly way.
 -   **Persistent Chat History:** The conversation history is lost on every page refresh. You would need to store the AI and UI state in a database to make conversations persistent.
